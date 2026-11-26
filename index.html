@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>被詛咒的廢棄校舍 - 冒險大廳</title>
+  <style>
+    body { background: #0d0f12; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: auto; padding: 20px; }
+    h1 { color: #f59e0b; text-align: center; text-shadow: 0 0 10px rgba(245,158,11,0.5); }
+    .nav { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
+    .nav a { color: #94a3b8; text-decoration: none; padding: 8px 16px; border: 1px solid #334155; border-radius: 6px; }
+    .nav a.active { background: #b45309; color: white; border-color: #f59e0b; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+    .card { background: #1e293b; border: 2px solid #334155; border-radius: 10px; padding: 15px; cursor: pointer; transition: 0.2s; }
+    .card.selected { border-color: #f59e0b; background: #292524; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 5px; }
+    .hp { background: #991b1b; } .san { background: #1e40af; }
+    input, button { padding: 10px; border-radius: 6px; border: none; font-size: 16px; }
+    input { background: #1e293b; color: white; border: 1px solid #475569; width: 250px; }
+    button { background: #d97706; color: white; cursor: pointer; font-weight: bold; }
+    button:hover { background: #b45309; }
+    .btn-del { background: #7f1d1d; padding: 5px 10px; font-size: 13px; margin-left: 10px; }
+    .save-item { background: #1e293b; padding: 12px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+  <h1>🏚️ 被詛咒的廢棄校舍</h1>
+  <div class="nav">
+    <a href="index.html" class="active">1. 選擇角色與存檔</a>
+    <a href="explore.html">2. 進入校舍探索</a>
+    <a href="admin.html">3. 倖存榜與事件編輯</a>
+  </div>
+
+  <h3>Step 1. 選擇你的淘氣小孩角色</h3>
+  <div id="charList" class="grid">載入角色資料中...</div>
+
+  <div style="margin-top: 25px; background: #171717; padding: 20px; border-radius: 10px;">
+    <h3>Step 2. 輸入探險者暱稱並出發</h3>
+    <input type="text" id="playerName" placeholder="請輸入你的名字...">
+    <button onclick="startNewGame()">🔦 推開校舍大門</button>
+  </div>
+
+  <h3 style="margin-top: 30px;">📂 繼續未完成的探險（讀取/刪除雲端存檔）</h3>
+  <div id="saveList">載入雲端存檔中...</div>
+
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwbf09HUXzjxLQCvq6GGefg0FiJR_M_iN2XFWLb7NSqBsxrnxHXtqlZ5eMLXI9JzLqlPg/exec';
+    let selectedCharId = 'C01';
+
+    async function callAPI(payload) {
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+      return await res.json();
+    }
+
+    async function init() {
+      const res = await callAPI({ action: 'getInitLobby' });
+      if (res.status !== 'success') return alert(res.message);
+
+      // 渲染角色卡片
+      const charDiv = document.getElementById('charList');
+      charDiv.innerHTML = res.data.characters.map((c, idx) => `
+        <div class="card ${idx === 0 ? 'selected' : ''}" onclick="selectChar('${c.CharID}', this)">
+          <h4>${c.Name}</h4>
+          <div><span class="badge hp">HP ${c.MaxHP}</span><span class="badge san">SAN ${c.MaxSAN}</span></div>
+          <p style="color:#fbbf24; font-size:13px;">★ ${c.Skill}</p>
+          <p style="font-size:14px; color:#cbd5e1;">${c.Description}</p>
+        </div>
+      `).join('');
+
+      // 渲染「探索中」的存檔
+      const activeSaves = res.data.records.filter(r => r.Status === '探索中');
+      const saveDiv = document.getElementById('saveList');
+      saveDiv.innerHTML = activeSaves.length ? activeSaves.map(s => `
+        <div class="save-item">
+          <div>
+            <strong>${s.PlayerName}</strong>（角色：${s.CharName}）｜ HP: ${s.HP} / SAN: ${s.SAN} ｜ 秘寶數：${s.Treasures ? s.Treasures.split(',').length : 0}/3
+          </div>
+          <div>
+            <button onclick="resumeGame('${s.SaveID}')">繼續探索</button>
+            <button class="btn-del" onclick="deleteSave('${s.SaveID}')">刪除</button>
+          </div>
+        </div>
+      `).join('') : '<p style="color:#64748b;">目前沒有進行中的探險存檔。</p>';
+    }
+
+    function selectChar(id, el) {
+      selectedCharId = id;
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    async function startNewGame() {
+      const name = document.getElementById('playerName').value.trim();
+      if (!name) return alert('請輸入探險者暱稱！');
+      const res = await callAPI({ action: 'createGame', playerName: name, charId: selectedCharId });
+      if (res.status === 'success') {
+        localStorage.setItem('currentSaveId', res.data.SaveID);
+        location.href = 'explore.html';
+      }
+    }
+
+    function resumeGame(saveId) {
+      localStorage.setItem('currentSaveId', saveId);
+      location.href = 'explore.html';
+    }
+
+    async function deleteSave(saveId) {
+      if (!confirm('確定要刪除此存檔嗎？')) return;
+      await callAPI({ action: 'deleteSave', saveId });
+      init();
+    }
+
+    init();
+  </script>
+</body>
+</html>

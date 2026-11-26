@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>倖存者排行榜與關卡事件編輯</title>
+  <style>
+    body { background: #0d0f12; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: auto; padding: 20px; }
+    .nav { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
+    .nav a { color: #94a3b8; text-decoration: none; padding: 8px 16px; border: 1px solid #334155; border-radius: 6px; }
+    .nav a.active { background: #b45309; color: white; border-color: #f59e0b; }
+    table { width: 100%; border-collapse: collapse; background: #1e293b; margin-bottom: 30px; }
+    th, td { border: 1px solid #334155; padding: 10px; text-align: left; }
+    th { background: #0f172a; color: #f59e0b; }
+    .form-box { background: #1e293b; padding: 20px; border-radius: 10px; margin-bottom: 25px; }
+    input, select, button { padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #475569; background: #0f172a; color: white; }
+    button { background: #d97706; border: none; cursor: pointer; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center; color:#f59e0b;">🏆 倖存者榮譽榜 & 👻 校舍事件管理後台</h1>
+  <div class="nav">
+    <a href="index.html">1. 選擇角色與存檔</a>
+    <a href="explore.html">2. 進入校舍探索</a>
+    <a href="admin.html" class="active">3. 倖存榜與事件編輯</a>
+  </div>
+
+  <h3>🏆 成功逃脫倖存者名單（讀取 GameRecords 資料表）</h3>
+  <table>
+    <thead><tr><th>玩家暱稱</th><th>使用角色</th><th>剩餘 HP</th><th>剩餘 SAN</th><th>收集秘寶</th><th>通關時間</th></tr></thead>
+    <tbody id="rankBody"><tr><td colspan="6">載入中...</td></tr></tbody>
+  </table>
+
+  <h3>👻 新增校舍探索事件（寫入 Events 資料表，需管理密碼）</h3>
+  <div class="form-box">
+    <select id="evLoc"><option>舊教室</option><option>音樂教室</option><option>舊保健室</option><option>校長室</option></select>
+    <select id="evType"><option>鬼怪</option><option>陷阱</option><option>補給</option><option>寶物</option></select>
+    <input type="text" id="evTitle" placeholder="事件標題（如：會動的銅像）">
+    <input type="text" id="evContent" placeholder="劇情描述..." style="width:300px;">
+    <input type="number" id="evHp" placeholder="HP增減 (如 -15)" style="width:130px;">
+    <input type="number" id="evSan" placeholder="SAN增減 (如 -10)" style="width:130px;">
+    <input type="text" id="evTreasure" placeholder="寶物名稱（非寶物留空）">
+    <input type="password" id="adminPass" placeholder="管理密碼 (ilt2026)">
+    <button onclick="addEvent()">＋ 新增至資料庫</button>
+  </div>
+
+  <h3>📜 現有校舍事件庫管理（可刪除事件）</h3>
+  <table>
+    <thead><tr><th>編號</th><th>地點</th><th>類型</th><th>標題</th><th>HP/SAN</th><th>寶物</th><th>操作</th></tr></thead>
+    <tbody id="eventBody"><tr><td colspan="7">載入中...</td></tr></tbody>
+  </table>
+
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwbf09HUXzjxLQCvq6GGefg0FiJR_M_iN2XFWLb7NSqBsxrnxHXtqlZ5eMLXI9JzLqlPg/exec';
+
+    async function callAPI(payload) {
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+      return await res.json();
+    }
+
+    async function loadAll() {
+      const res = await callAPI({ action: 'getAdminAndRank' });
+      if (res.status !== 'success') return alert(res.message);
+
+      // 渲染成功逃脫排行榜
+      const winners = res.data.records.filter(r => r.Status === '逃脫成功');
+      document.getElementById('rankBody').innerHTML = winners.length ? winners.map(w => `
+        <tr><td>${w.PlayerName}</td><td>${w.CharName}</td><td>${w.HP}</td><td>${w.SAN}</td><td>${w.Treasures}</td><td>${w.UpdatedAt}</td></tr>
+      `).join('') : '<tr><td colspan="6">尚無人成功逃出廢棄校舍...</td></tr>';
+
+      // 渲染事件庫
+      document.getElementById('eventBody').innerHTML = res.data.events.map(e => `
+        <tr>
+          <td>${e.EventID}</td><td>${e.Location}</td><td>${e.Type}</td><td>${e.Title}</td>
+          <td>${e.HP_Diff} / ${e.SAN_Diff}</td><td>${e.TreasureName || '-'}</td>
+          <td><button style="background:#991b1b;" onclick="delEvent('${e.EventID}')">刪除</button></td>
+        </tr>
+      `).join('');
+    }
+
+    async function addEvent() {
+      const payload = {
+        action: 'addEvent',
+        location: document.getElementById('evLoc').value,
+        type: document.getElementById('evType').value,
+        title: document.getElementById('evTitle').value,
+        content: document.getElementById('evContent').value,
+        hpDiff: document.getElementById('evHp').value || 0,
+        sanDiff: document.getElementById('evSan').value || 0,
+        treasureName: document.getElementById('evTreasure').value,
+        password: document.getElementById('adminPass').value
+      };
+      const res = await callAPI(payload);
+      if (res.status === 'success') { alert('新增成功！'); loadAll(); }
+      else alert(res.message);
+    }
+
+    async function delEvent(eventId) {
+      const password = prompt('請輸入管理密碼以刪除事件（預設：ilt2026）：');
+      if (!password) return;
+      const res = await callAPI({ action: 'deleteEvent', eventId, password });
+      if (res.status === 'success') { alert('已刪除！'); loadAll(); }
+      else alert(res.message);
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>
