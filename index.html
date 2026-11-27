@@ -46,21 +46,19 @@
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwbf09HUXzjxLQCvq6GGefg0FiJR_M_iN2XFWLb7NSqBsxrnxHXtqlZ5eMLXI9JzLqlPg/exec';
     let selectedCharId = 'C01';
 
-async function callAPI(payload) {
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
-  });
-  return await res.json();
-}
-
+    async function callAPI(payload) {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    }
 
     async function init() {
       const res = await callAPI({ action: 'getInitLobby' });
       if (res.status !== 'success') return alert(res.message);
 
-      // 渲染角色卡片
       const charDiv = document.getElementById('charList');
       charDiv.innerHTML = res.data.characters.map((c, idx) => `
         <div class="card ${idx === 0 ? 'selected' : ''}" onclick="selectChar('${c.CharID}', this)">
@@ -71,7 +69,6 @@ async function callAPI(payload) {
         </div>
       `).join('');
 
-      // 渲染「探索中」的存檔
       const activeSaves = res.data.records.filter(r => r.Status === '探索中');
       const saveDiv = document.getElementById('saveList');
       saveDiv.innerHTML = activeSaves.length ? activeSaves.map(s => `
@@ -100,6 +97,8 @@ async function callAPI(payload) {
       if (res.status === 'success') {
         localStorage.setItem('currentSaveId', res.data.SaveID);
         location.href = 'explore.html';
+      } else {
+        alert(res.message);
       }
     }
 
