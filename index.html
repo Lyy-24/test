@@ -49,11 +49,13 @@
     async function callAPI(payload) {
       const res = await fetch(GAS_URL, {
         method: 'POST',
+        redirect: 'follow',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
       });
       return await res.json();
     }
+
 
     async function init() {
       const res = await callAPI({ action: 'getInitLobby' });
