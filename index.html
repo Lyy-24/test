@@ -46,10 +46,15 @@
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwbf09HUXzjxLQCvq6GGefg0FiJR_M_iN2XFWLb7NSqBsxrnxHXtqlZ5eMLXI9JzLqlPg/exec';
     let selectedCharId = 'C01';
 
-    async function callAPI(payload) {
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-      return await res.json();
-    }
+async function callAPI(payload) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
+}
+
 
     async function init() {
       const res = await callAPI({ action: 'getInitLobby' });
